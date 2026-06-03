@@ -1,38 +1,30 @@
 from __future__ import annotations
 
-import typing
-
-import commands2
 import wpilib
+import ntcore
 
-from robotcontainer import RobotContainer
+from config import X_AXIS, Y_AXIS
+from subsystems.turret import Turret
 
 
-class AprilTagAimbotRobot(commands2.TimedCommandRobot):
-    def robotInit(self) -> None:
-        self.container = RobotContainer()
-        self.autonomous_command: typing.Optional[commands2.Command] = None
-        wpilib.SmartDashboard.putData(
-            "CommandScheduler", commands2.CommandScheduler.getInstance()
-        )
+class TurretRobot(wpilib.TimedRobot):
+    def robotInit(self):
+        self.turret = Turret(X_AXIS, Y_AXIS)
+        self.turret.configure()
 
-    def disabledInit(self) -> None:
-        self.container.stop_all_motion()
+        self.limelight = ntcore.NetworkTableInstance.getDefault().getTable("limelight")
 
-    def autonomousInit(self) -> None:
-        self.autonomous_command = self.container.get_autonomous_command()
-        if self.autonomous_command is not None:
-            self.autonomous_command.schedule()
+    def teleopInit(self):
+        self.turret.initialize()
 
-    def teleopInit(self) -> None:
-        if self.autonomous_command is not None:
-            self.autonomous_command.cancel()
-            self.autonomous_command = None
+    def teleopPeriodic(self):
+        tv = self.limelight.getEntry("tv").getDouble(0.0)
 
-    def testInit(self) -> None:
-        commands2.CommandScheduler.getInstance().cancelAll()
-        self.container.stop_all_motion()
+        if tv > 0.0:
+            tx = self.limelight.getEntry("tx").getDouble(0.0)
+            ty = self.limelight.getEntry("ty").getDouble(0.0)
+            self.turret.track(ty, tx) # inverted because of how the limelight is mounted
 
 
 if __name__ == "__main__":
-    wpilib.run(AprilTagAimbotRobot)
+    wpilib.run(TurretRobot)
